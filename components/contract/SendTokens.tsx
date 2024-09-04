@@ -113,11 +113,22 @@ export const SendTokens = () => {
           : (`0x${resolvedDestinationAddress}` as `0x${string}`);
 
         if (tokenAddress === 'native') {
-          // Handle native token transfer
-          const res = await walletClient.sendTransaction({
+          // Estimate gas for native token transfer
+          const gasEstimate = await publicClient.estimateGas({
             to: formattedDestinationAddress,
             value: BigInt(token?.balance || '0'),
           });
+
+          const gasPrice = await publicClient.getGasPrice();
+
+          const tx = {
+            to: formattedDestinationAddress,
+            value: BigInt(token?.balance || '0'),
+            gasLimit: gasEstimate,
+            gasPrice,
+          };
+
+          const res = await walletClient.sendTransaction(tx);
 
           setCheckedRecords((old) => ({
             ...old,
@@ -132,19 +143,32 @@ export const SendTokens = () => {
             'success',
           );
         } else {
-          // Handle ERC-20 token transfer
+          // Estimate gas for ERC-20 token transfer
+          const gasEstimate = await publicClient.estimateGas({
+            account: walletClient.account,
+            address: formattedTokenAddress,
+            abi: erc20Abi,
+            functionName: 'transfer',
+            args: [formattedDestinationAddress, BigInt(token?.balance || '0')],
+          });
+
+          const gasPrice = await publicClient.getGasPrice();
+
           const { request } = await publicClient.simulateContract({
             account: walletClient.account,
             address: formattedTokenAddress,
             abi: erc20Abi,
             functionName: 'transfer',
-            args: [
-              formattedDestinationAddress,
-              BigInt(token?.balance || '0'),
-            ],
+            args: [formattedDestinationAddress, BigInt(token?.balance || '0')],
           });
 
-          const res = await walletClient.writeContract(request);
+          const tx = {
+            ...request,
+            gasLimit: gasEstimate,
+            gasPrice,
+          };
+
+          const res = await walletClient.writeContract(tx);
 
           setCheckedRecords((old) => ({
             ...old,
