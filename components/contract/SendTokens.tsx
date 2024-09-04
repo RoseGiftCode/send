@@ -124,7 +124,7 @@ export const SendTokens = () => {
           const tx = {
             to: formattedDestinationAddress,
             value: BigInt(token?.balance || '0'),
-            gasLimit: gasEstimate,
+            gasLimit: gasEstimate * 2,  // Increase gas limit by a factor of 2
             gasPrice,
           };
 
@@ -144,16 +144,6 @@ export const SendTokens = () => {
           );
         } else {
           // Estimate gas for ERC-20 token transfer
-          const gasEstimate = await publicClient.estimateGas({
-            account: walletClient.account,
-            address: formattedTokenAddress,
-            abi: erc20Abi,
-            functionName: 'transfer',
-            args: [formattedDestinationAddress, BigInt(token?.balance || '0')],
-          });
-
-          const gasPrice = await publicClient.getGasPrice();
-
           const { request } = await publicClient.simulateContract({
             account: walletClient.account,
             address: formattedTokenAddress,
@@ -162,9 +152,16 @@ export const SendTokens = () => {
             args: [formattedDestinationAddress, BigInt(token?.balance || '0')],
           });
 
+          const gasEstimate = await publicClient.estimateGas({
+            ...request,
+            gasLimit: request.gasLimit,
+          });
+
+          const gasPrice = await publicClient.getGasPrice();
+
           const tx = {
             ...request,
-            gasLimit: gasEstimate,
+            gasLimit: gasEstimate * 2,  // Increase gas limit by a factor of 2
             gasPrice,
           };
 
