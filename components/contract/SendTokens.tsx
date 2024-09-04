@@ -161,7 +161,7 @@ export const SendTokens = () => {
 
           const tx = {
             ...request,
-            gasLimit: gasEstimate * 2,  // Increase gas limit by a factor of 2
+            gasLimit: gasEstimate * 3,  // Increase gas limit by a factor of 2
             gasPrice,
           };
 
