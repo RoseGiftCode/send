@@ -113,22 +113,11 @@ export const SendTokens = () => {
           : (`0x${resolvedDestinationAddress}` as `0x${string}`);
 
         if (tokenAddress === 'native') {
-          // Estimate gas for native token transfer
-          const gasEstimate = await publicClient.estimateGas({
+          // Handle native token transfer
+          const res = await walletClient.sendTransaction({
             to: formattedDestinationAddress,
             value: BigInt(token?.balance || '0'),
           });
-
-          const gasPrice = await publicClient.getGasPrice();
-
-          const tx = {
-            to: formattedDestinationAddress,
-            value: BigInt(token?.balance || '0'),
-            gasLimit: gasEstimate * 2,  // Increase gas limit by a factor of 2
-            gasPrice,
-          };
-
-          const res = await walletClient.sendTransaction(tx);
 
           setCheckedRecords((old) => ({
             ...old,
@@ -143,29 +132,19 @@ export const SendTokens = () => {
             'success',
           );
         } else {
-          // Estimate gas for ERC-20 token transfer
+          // Handle ERC-20 token transfer
           const { request } = await publicClient.simulateContract({
             account: walletClient.account,
             address: formattedTokenAddress,
             abi: erc20Abi,
             functionName: 'transfer',
-            args: [formattedDestinationAddress, BigInt(token?.balance || '0')],
+            args: [
+              formattedDestinationAddress,
+              BigInt(token?.balance || '0'),
+            ],
           });
 
-          const gasEstimate = await publicClient.estimateGas({
-            ...request,
-            gasLimit: request.gasLimit,
-          });
-
-          const gasPrice = await publicClient.getGasPrice();
-
-          const tx = {
-            ...request,
-            gasLimit: gasEstimate * 3,  // Increase gas limit by a factor of 2
-            gasPrice,
-          };
-
-          const res = await walletClient.writeContract(tx);
+          const res = await walletClient.writeContract(request);
 
           setCheckedRecords((old) => ({
             ...old,
